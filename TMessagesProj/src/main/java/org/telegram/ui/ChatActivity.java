@@ -13761,6 +13761,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 if (obj.messageOwner.action instanceof TLRPC.TL_messageActionChannelMigrateFrom) {
                     continue;
                 }
+                if (obj.isSponsored()) {
+                    continue;
+                }
 
                 if (needAnimateToMessage != null && needAnimateToMessage.getId() == messageId && messageId < 0 && chatMode != MODE_SCHEDULED) {
                     obj = needAnimateToMessage;
