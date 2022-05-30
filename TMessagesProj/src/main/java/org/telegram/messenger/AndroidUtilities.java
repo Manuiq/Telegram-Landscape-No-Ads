@@ -1004,6 +1004,7 @@ public class AndroidUtilities {
         if (activity == null || prevOrientation != -10) {
             return;
         }
+        /*
         try {
             prevOrientation = activity.getRequestedOrientation();
             WindowManager manager = (WindowManager) activity.getSystemService(Activity.WINDOW_SERVICE);
@@ -1039,7 +1040,7 @@ public class AndroidUtilities {
             }
         } catch (Exception e) {
             FileLog.e(e);
-        }
+        }*/
     }
 
     @SuppressLint("WrongConstant")

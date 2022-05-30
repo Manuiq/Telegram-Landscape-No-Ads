@@ -424,7 +424,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         if (!AndroidUtilities.isTablet()) {
             Activity activity = getParentActivity();
             if (activity != null) {
-                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                //activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             }
         }
     }
