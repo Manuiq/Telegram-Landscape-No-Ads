@@ -1462,7 +1462,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             entity instanceof TLRPC.TL_messageEntityItalic ||
                             entity instanceof TLRPC.TL_messageEntityPre ||
                             entity instanceof TLRPC.TL_messageEntityCode ||
-                            entity instanceof TLRPC.TL_messageEntityTextUrl) {
+                            entity instanceof TLRPC.TL_messageEntityTextUrl ||
+                            entity instanceof TLRPC.TL_messageEntitySpoiler) {
                         entities.add(entity);
                     }
                 }
@@ -1932,6 +1933,16 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 newMsgObj.wasJustSent = true;
                 objArr.add(newMsgObj);
                 arr.add(newMsg);
+
+                if (msgObj.replyMessageObject != null) {
+                    for (int i = 0; i < messages.size(); i++) {
+                        if (messages.get(i).getId() == msgObj.replyMessageObject.getId()) {
+                            newMsgObj.messageOwner.replyMessage = msgObj.replyMessageObject.messageOwner;
+                            newMsgObj.replyMessageObject = msgObj.replyMessageObject;
+                            break;
+                        }
+                    }
+                }
 
                 putToSendingMessages(newMsg, scheduleDate != 0);
                 boolean differentDialog = false;
@@ -2657,30 +2668,33 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         return voteSendTime.get(pollId, 0L);
     }
 
-    public void sendReaction(MessageObject messageObject, CharSequence reaction, ChatActivity parentFragment) {
+    public void sendReaction(MessageObject messageObject, CharSequence reaction, boolean big, ChatActivity parentFragment, Runnable callback) {
         if (messageObject == null || parentFragment == null) {
             return;
         }
         TLRPC.TL_messages_sendReaction req = new TLRPC.TL_messages_sendReaction();
-        req.peer = getMessagesController().getInputPeer(messageObject.getDialogId());
-        req.msg_id = messageObject.getId();
+        if (messageObject.messageOwner.isThreadMessage && messageObject.messageOwner.fwd_from != null) {
+            req.peer = getMessagesController().getInputPeer(messageObject.getFromChatId());
+            req.msg_id = messageObject.messageOwner.fwd_from.saved_from_msg_id;
+        } else {
+            req.peer = getMessagesController().getInputPeer(messageObject.getDialogId());
+            req.msg_id = messageObject.getId();
+        }
         if (reaction != null) {
             req.reaction = reaction.toString();
             req.flags |= 1;
         }
+        if (big) {
+            req.flags |= 2;
+            req.big = true;
+        }
         getConnectionsManager().sendRequest(req, (response, error) -> {
             if (response != null) {
                 getMessagesController().processUpdates((TLRPC.Updates) response, false);
-            }
-            /*AndroidUtilities.runOnUIThread(new Runnable() {
-                @Override
-                public void run() {
-                    waitingForVote.remove(key);
-                    if (finishRunnable != null) {
-                        finishRunnable.run();
-                    }
+                if (callback != null) {
+                    AndroidUtilities.runOnUIThread(callback);
                 }
-            });*/
+            }
         });
     }
 
@@ -2742,6 +2756,27 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     passwordFragment.needHideProgress();
                     passwordFragment.finishFragment();
                 }
+
+                long uid = messageObject.getFromChatId();
+                if (messageObject.messageOwner.via_bot_id != 0) {
+                    uid = messageObject.messageOwner.via_bot_id;
+                }
+                String name = null;
+                if (uid > 0) {
+                    TLRPC.User user = getMessagesController().getUser(uid);
+                    if (user != null) {
+                        name = ContactsController.formatName(user.first_name, user.last_name);
+                    }
+                } else {
+                    TLRPC.Chat chat = getMessagesController().getChat(-uid);
+                    if (chat != null) {
+                        name = chat.title;
+                    }
+                }
+                if (name == null) {
+                    name = "bot";
+                }
+
                 if (button instanceof TLRPC.TL_keyboardButtonUrlAuth) {
                     if (response instanceof TLRPC.TL_urlAuthResultRequest) {
                         TLRPC.TL_urlAuthResultRequest res = (TLRPC.TL_urlAuthResultRequest) response;
@@ -2766,26 +2801,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     if (!cacheFinal && res.cache_time != 0 && !button.requires_password) {
                         getMessagesStorage().saveBotCache(key, res);
                     }
+
                     if (res.message != null) {
-                        long uid = messageObject.getFromChatId();
-                        if (messageObject.messageOwner.via_bot_id != 0) {
-                            uid = messageObject.messageOwner.via_bot_id;
-                        }
-                        String name = null;
-                        if (uid > 0) {
-                            TLRPC.User user = getMessagesController().getUser(uid);
-                            if (user != null) {
-                                name = ContactsController.formatName(user.first_name, user.last_name);
-                            }
-                        } else {
-                            TLRPC.Chat chat = getMessagesController().getChat(-uid);
-                            if (chat != null) {
-                                name = chat.title;
-                            }
-                        }
-                        if (name == null) {
-                            name = "bot";
-                        }
                         if (res.alert) {
                             if (parentFragment.getParentActivity() == null) {
                                 return;
@@ -2801,10 +2818,6 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     } else if (res.url != null) {
                         if (parentFragment.getParentActivity() == null) {
                             return;
-                        }
-                        long uid = messageObject.getFromChatId();
-                        if (messageObject.messageOwner.via_bot_id != 0) {
-                            uid = messageObject.messageOwner.via_bot_id;
                         }
                         TLRPC.User user = getMessagesController().getUser(uid);
                         boolean verified = user != null && user.verified;
@@ -3360,7 +3373,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     newMsg.media.document = document;
                     if (params != null && params.containsKey("query_id")) {
                         type = 9;
-                    } else if (MessageObject.isVideoDocument(document) || MessageObject.isRoundVideoDocument(document) || videoEditedInfo != null) {
+                    } else if (!MessageObject.isVideoSticker(document) && (MessageObject.isVideoDocument(document) || MessageObject.isRoundVideoDocument(document) || videoEditedInfo != null)) {
                         type = 3;
                     } else if (MessageObject.isVoiceDocument(document)) {
                         type = 8;
@@ -6999,7 +7012,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
                         boolean isWebP = false;
                         if (tempPath != null && info.ttl <= 0 && (tempPath.endsWith(".gif") || (isWebP = tempPath.endsWith(".webp")))) {
-                            if (!isWebP || shouldSendWebPAsSticker(tempPath, null)) {
+                            if (media.size() <= 1 && (!isWebP || shouldSendWebPAsSticker(tempPath, null))) {
                                 continue;
                             } else {
                                 info.forceImage = true;
@@ -7008,7 +7021,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             continue;
                         } else if (tempPath == null && info.uri != null) {
                             if (MediaController.isGif(info.uri) || (isWebP = MediaController.isWebp(info.uri))) {
-                                if (!isWebP || shouldSendWebPAsSticker(null, info.uri)) {
+                                if (media.size() <= 1 && (!isWebP || shouldSendWebPAsSticker(null, info.uri))) {
                                     continue;
                                 } else {
                                     info.forceImage = true;
@@ -7864,7 +7877,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             selectedCompression = compressionsCount;
         }
         boolean needCompress = false;
-        if (selectedCompression != compressionsCount - 1 || Math.max(videoEditedInfo.originalWidth, videoEditedInfo.originalHeight) > 1280) {
+        if (selectedCompression != compressionsCount || Math.max(videoEditedInfo.originalWidth, videoEditedInfo.originalHeight) > 1280) {
             needCompress = true;
             switch (selectedCompression) {
                 case 1:
@@ -7890,16 +7903,16 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 videoEditedInfo.resultHeight, videoEditedInfo.resultWidth
         );
 
+
         if (!needCompress) {
             videoEditedInfo.resultWidth = videoEditedInfo.originalWidth;
             videoEditedInfo.resultHeight = videoEditedInfo.originalHeight;
             videoEditedInfo.bitrate = bitrate;
-            videoEditedInfo.estimatedSize = (int) (audioFramesSize + videoDuration / 1000.0f * bitrate / 8);
         } else {
             videoEditedInfo.bitrate = bitrate;
-            videoEditedInfo.estimatedSize = (int) (audioFramesSize + videoFramesSize);
-            videoEditedInfo.estimatedSize += videoEditedInfo.estimatedSize / (32 * 1024) * 16;
         }
+
+        videoEditedInfo.estimatedSize = (int) (audioFramesSize + videoDuration / 1000.0f * bitrate / 8);
         if (videoEditedInfo.estimatedSize == 0) {
             videoEditedInfo.estimatedSize = 1;
         }

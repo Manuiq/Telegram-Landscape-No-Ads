@@ -8,12 +8,10 @@
 
 package org.telegram.messenger;
 
-import androidx.annotation.UiThread;
-
 import android.os.SystemClock;
 import android.util.SparseArray;
 
-import com.google.android.exoplayer2.util.Log;
+import androidx.annotation.UiThread;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +40,7 @@ public class NotificationCenter {
     public static final int messageReceivedByAck = totalEvents++;
     public static final int messageReceivedByServer = totalEvents++;
     public static final int messageSendError = totalEvents++;
+    public static final int forceImportContactsStart = totalEvents++;
     public static final int contactsDidLoad = totalEvents++;
     public static final int contactsImported = totalEvents++;
     public static final int hasNewContactsToImport = totalEvents++;
@@ -111,6 +110,8 @@ public class NotificationCenter {
     public static final int newPeopleNearbyAvailable = totalEvents++;
     public static final int stopAllHeavyOperations = totalEvents++;
     public static final int startAllHeavyOperations = totalEvents++;
+    public static final int stopSpoilers = totalEvents++;
+    public static final int startSpoilers = totalEvents++;
     public static final int sendingMessagesChanged = totalEvents++;
     public static final int didUpdateReactions = totalEvents++;
     public static final int didVerifyMessagesStickers = totalEvents++;
@@ -122,6 +123,9 @@ public class NotificationCenter {
     public static final int stickersImportProgressChanged = totalEvents++;
     public static final int stickersImportComplete = totalEvents++;
     public static final int dialogDeleted = totalEvents++;
+    public static final int webViewResultSent = totalEvents++;
+
+    public static final int didGenerateFingerprintKeyPair = totalEvents++;
 
     public static final int walletPendingTransactionsChanged = totalEvents++;
     public static final int walletSyncProgressChanged = totalEvents++;
@@ -185,6 +189,8 @@ public class NotificationCenter {
     public static final int filterSettingsUpdated = totalEvents++;
     public static final int suggestedFiltersLoaded = totalEvents++;
 
+    public static final int updateBotMenuButton = totalEvents++;
+
     //global
     public static final int pushMessagesUpdated = totalEvents++;
     public static final int stopEncodingService = totalEvents++;
@@ -206,6 +212,7 @@ public class NotificationCenter {
     public static final int needSetDayNightTheme = totalEvents++;
     public static final int goingToPreviewTheme = totalEvents++;
     public static final int locationPermissionGranted = totalEvents++;
+    public static final int locationPermissionDenied = totalEvents++;
     public static final int reloadInterface = totalEvents++;
     public static final int suggestedLangpack = totalEvents++;
     public static final int didSetNewWallpapper = totalEvents++;
@@ -228,6 +235,15 @@ public class NotificationCenter {
     public static final int onDatabaseMigration = totalEvents++;
     public static final int onEmojiInteractionsReceived = totalEvents++;
     public static final int emojiPreviewThemesChanged = totalEvents++;
+    public static final int reactionsDidLoad = totalEvents++;
+    public static final int attachMenuBotsDidLoad = totalEvents++;
+    public static final int chatAvailableReactionsUpdated = totalEvents++;
+    public static final int dialogsUnreadReactionsCounterChanged = totalEvents++;
+    public static final int onDatabaseOpened = totalEvents++;
+    public static final int onDownloadingFilesChanged = totalEvents++;
+    public static final int onActivityResultReceived = totalEvents++;
+    public static final int onRequestPermissionResultReceived = totalEvents++;
+    public static final int onUserRingtonesUpdated = totalEvents++;
 
     private SparseArray<ArrayList<NotificationCenterDelegate>> observers = new SparseArray<>();
     private SparseArray<ArrayList<NotificationCenterDelegate>> removeAfterBroadcast = new SparseArray<>();
@@ -401,7 +417,7 @@ public class NotificationCenter {
             delayedRunnablesTmp.addAll(delayedRunnables);
             delayedRunnables.clear();
             for (int a = 0; a < delayedRunnablesTmp.size(); a++) {
-                delayedRunnablesTmp.get(a).run();
+                AndroidUtilities.runOnUIThread(delayedRunnablesTmp.get(a));
             }
             delayedRunnablesTmp.clear();
         }
