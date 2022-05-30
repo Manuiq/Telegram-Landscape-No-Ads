@@ -1,3 +1,13 @@
+## Fork changes
+This is an official Fork of https://github.com/DrKLO/Telegram with practical changes for my needs:
+- landscape orientation support (especially useful for tablets)
+- disabled integrated ads (who doesn't love ad blockers)
+- private chat content sharing restriction disable (yep,such an important privacy feature is client-side only, let the information flow) 
+
+As such changes may violate Telegram API usage terms you'll have to 
+1) obtain your own API_ID https://core.telegram.org/api/obtaining_api_id
+2) Update APP_ID and APP_HASH in org.telegram.messenger.BuildVars.java file
+3) build an apk from sources using Android Studio https://developer.android.com/studio
 ## Telegram messenger for Android
 
 [Telegram](https://telegram.org) is a messaging app with a focus on speed and security. It’s superfast, simple and free.
